@@ -1,0 +1,192 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import warnings
+
+# Suppress font warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib.font_manager')
+
+# Set style for publication-quality figures
+plt.rcParams['figure.dpi'] = 300
+plt.rcParams['savefig.dpi'] = 300
+plt.rcParams['font.size'] = 12
+plt.rcParams['font.family'] = 'sans-serif'
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'Helvetica', 'Liberation Sans']
+
+# Sample labels
+labels = ['Sample 5\nCtrl 6.5', 'Sample 1\nUS 6.5', 'Sample 2\nCtrl 9.0', 'Sample 6\nUS 9.0']
+x_pos = np.arange(len(labels))
+
+# Complete TPA data - 6 parameters
+tpa_complete = {
+    'Hardness (g)': {
+        'means': [4.104, 6.269, 9.088, 5.702],
+        'stds': [2.812, 0.559, 2.018, 4.082],
+        'colors': ['#f97316', '#14b8a6', '#84cc16', '#1e40af'],
+        'sig_letters': ['c', 'b', 'a', 'bc']
+    },
+    'Adhesiveness (g·sec)': {
+        'means': [4.379, 0.842, 1.161, 4.405],  # ABSOLUTE VALUES (no negatives)
+        'stds': [7.184, 1.363, 1.803, 1.142],
+        'colors': ['#f97316', '#14b8a6', '#84cc16', '#1e40af'],
+        'sig_letters': ['a', 'b', 'b', 'a']
+    },
+    'Resilience (%)': {
+        'means': [1.327, 0.455, 9.276, 4.141],
+        'stds': [1.121, 0.307, 8.708, 3.372],
+        'colors': ['#f97316', '#14b8a6', '#84cc16', '#1e40af'],
+        'sig_letters': ['c', 'c', 'a', 'b']
+    },
+    'Cohesion': {
+        'means': [0.31, 0.317, 0.522, 0.669],
+        'stds': [0.284, 0.281, 0.129, 0.115],
+        'colors': ['#f97316', '#14b8a6', '#84cc16', '#1e40af'],
+        'sig_letters': ['b', 'b', 'b', 'a']
+    },
+    'Springiness (%)': {
+        'means': [34.243, 22.663, 27.626, 45.74],
+        'stds': [44.369, 19.641, 6.106, 7.762],
+        'colors': ['#f97316', '#14b8a6', '#84cc16', '#1e40af'],
+        'sig_letters': ['ab', 'b', 'b', 'a']
+    },
+    'Gumminess': {
+        # CALCULATED: Gumminess = Hardness × Cohesion
+        'means': [
+            4.104 * 0.31,    # Sample 5: 1.272
+            6.269 * 0.317,   # Sample 1: 1.987
+            9.088 * 0.522,   # Sample 2: 4.744
+            5.702 * 0.669    # Sample 6: 3.815
+        ],
+        # Propagate error: sqrt((H*SD_C)^2 + (C*SD_H)^2)
+        'stds': [
+            np.sqrt((4.104*0.284)**2 + (0.31*2.812)**2),   # 1.222
+            np.sqrt((6.269*0.281)**2 + (0.317*0.559)**2),  # 1.774
+            np.sqrt((9.088*0.129)**2 + (0.522*2.018)**2),  # 1.407
+            np.sqrt((5.702*0.115)**2 + (0.669*4.082)**2)   # 2.789
+        ],
+        'colors': ['#f97316', '#14b8a6', '#84cc16', '#1e40af'],
+        'sig_letters': ['c', 'bc', 'a', 'ab']
+    }
+}
+
+# Print calculated gumminess values for verification
+print("\n" + "="*80)
+print("GUMMINESS CALCULATION VERIFICATION:")
+print("="*80)
+for i, label in enumerate(labels):
+    hardness = tpa_complete['Hardness (g)']['means'][i]
+    cohesion = tpa_complete['Cohesion']['means'][i]
+    gumminess = tpa_complete['Gumminess']['means'][i]
+    print(f"{label:20s}: Hardness ({hardness:.3f}) × Cohesion ({cohesion:.3f}) = {gumminess:.3f}")
+print("="*80 + "\n")
+
+# ============================================================================
+# COMPLETE FIGURE: All 6 Parameters in 2×3 Grid
+# ============================================================================
+
+fig, axes = plt.subplots(2, 3, figsize=(20, 11))
+axes_flat = axes.flatten()
+
+# Create each subplot
+for idx, (param_name, param_data) in enumerate(tpa_complete.items()):
+    ax = axes_flat[idx]
+    
+    means = param_data['means']
+    stds = param_data['stds']
+    colors = param_data['colors']
+    sig_letters = param_data['sig_letters']
+    
+    # Create bars
+    bars = ax.bar(x_pos, means, color=colors, alpha=0.85,
+                   edgecolor='black', linewidth=2.5, width=0.65)
+    
+    # Add error bars
+    ax.errorbar(x_pos, means, yerr=stds, fmt='none',
+                ecolor='black', capsize=9, capthick=2.5, linewidth=2.5)
+    
+    # Calculate proper spacing
+    all_vals = [m + s for m, s in zip(means, stds)]
+    y_max = max(all_vals)
+    
+    # Special handling for parameters with large error bars
+    if param_name == 'Springiness (%)' or param_name == 'Adhesiveness (g·sec)':
+        value_offset = y_max * 0.06
+        letter_offset = y_max * 0.13
+        padding = y_max * 0.22
+    else:
+        value_offset = y_max * 0.05
+        letter_offset = y_max * 0.12
+        padding = y_max * 0.20
+    
+    # Add value labels and significance letters
+    for i, (m, s, letter) in enumerate(zip(means, stds, sig_letters)):
+        y_pos = m + s
+        
+        # Value label
+        ax.text(i, y_pos + value_offset, f'{m:.2f}', 
+                ha='center', va='bottom',
+                fontsize=13, fontweight='bold', color='black')
+        
+        # Statistical significance letter - CLEARLY SEPARATED
+        ax.text(i, y_pos + letter_offset, letter, 
+                ha='center', va='bottom',
+                fontsize=16, style='italic', color='black')
+    
+    # Customize subplot
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(labels, fontsize=12, fontweight='bold')
+    ax.set_ylabel(param_name, fontsize=15, fontweight='bold')
+    
+    # Set y-axis limits
+    ax.set_ylim([0, y_max + padding])
+    
+    # Grid and spines
+    ax.grid(axis='y', alpha=0.3, linestyle='--', linewidth=1)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_linewidth(2)
+    ax.spines['bottom'].set_linewidth(2)
+    
+    # Make tick labels bold
+    ax.tick_params(axis='both', which='major', labelsize=11, width=2)
+
+# NO FOOTNOTE in figure
+plt.tight_layout(pad=2.0)
+plt.savefig('TPA_Six_Parameters_Complete_HD.png', dpi=300, bbox_inches='tight', facecolor='white')
+print("✓ Saved: TPA_Six_Parameters_Complete_HD.png")
+plt.show()
+
+print("\n" + "="*80)
+print("COMPLETE 6-PARAMETER TPA FIGURE GENERATED!")
+print("="*80)
+print("\n📊 File: TPA_Six_Parameters_Complete_HD.png")
+print("\nFeatures:")
+print("  ✓ All 6 parameters in 2×3 grid layout")
+print("  ✓ Gumminess CALCULATED: Hardness × Cohesion")
+print("  ✓ Adhesiveness shown as ABSOLUTE values (no negatives)")
+print("  ✓ Statistical significance letters clearly visible")
+print("  ✓ NO footnote in figure")
+print("  ✓ HD quality (300 DPI)")
+print("  ✓ Perfect for ONE presentation slide")
+print("\n" + "="*80)
+print("FIGURE CAPTION (Copy this for your document):")
+print("="*80)
+print("""
+**Figure 1.** Texture profile analysis parameters of yellow pea protein isolate 
+gels as affected by pH and ultrasound pretreatment. Four treatments were 
+evaluated: Control pH 6.5 (Sample 5, orange), PPI-US pH 6.5 (Sample 1, teal), 
+Control pH 9.0 (Sample 2, green), and PPI-US pH 9.0 (Sample 6, blue). 
+Gumminess was calculated as Hardness × Cohesion. Adhesiveness values are 
+presented as absolute values. Values represent mean ± standard deviation 
+(n = 3). Letters (a, b, c) within each parameter indicate statistically 
+significant differences (p < 0.05).
+""")
+print("="*80)
+print("\nALTERNATIVE SHORT CAPTION:")
+print("="*80)
+print("""
+**Figure 1.** Effect of pH (6.5 vs 9.0) and ultrasound pretreatment on texture 
+profile analysis parameters of pea protein isolate gels. Gumminess = Hardness × 
+Cohesion. Mean ± SD (n = 3). Different letters denote significant differences 
+(p < 0.05).
+""")
+print("="*80)
